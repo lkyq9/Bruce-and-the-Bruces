@@ -1,17 +1,196 @@
 <html>
     <head>
-        <script src="./main.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+
+<!--        <script src="./main.js"></script>-->
     </head>
     <body>
-        <canvas id="game" width="1000px" height="1000px"></canvas>
+        <p>It's <span id="currentPlayer"></span>'s turn</p>
+        <canvas id="game" width="750px" height="750px"></canvas>
         <script>
             var c = document.getElementById("game");
+            var blockData = {
+                wallThickness : 7.5,
+                width : c.width/3,
+                height : c.height/3
+            }
+
             var ctx = c.getContext("2d");
             ctx.fillStyle = "black";
-            ctx.fillRect(250,0,10,750);
-            ctx.fillRect(500,0,10,750);
-            ctx.fillRect(0,250,750,10);
-            ctx.fillRect(0,500,750,10);
+            ctx.fillRect(blockData.width,0,blockData.wallThickness,c.height);
+            ctx.fillRect(2*blockData.width,0,blockData.wallThickness,c.height);
+            ctx.fillRect(0,blockData.height,c.height,blockData.wallThickness);
+            ctx.fillRect(0,2*(blockData.height),c.height,blockData.wallThickness);
+            
+            function getQuadrant(canvas, blockData, mousePos) {
+                var col0Boundary = blockData.width;
+                var row0Boundary = blockData.height;
+                var row0Boundary = blockData.height;
+                var col1Boundary = 2*blockData.width;
+                var row1Boundary = 2*blockData.height;
+                var col2Boundary = 3*blockData.width; // No wall drawn on right side
+                var row2Boundary = 3*blockData.height;
+                                
+                function getColumn(q) {
+                    if(mousePos.x > 0 && mousePos.x < col0Boundary) {
+                        q.index = 0;
+                        q.xStartBound = 0;
+                        q.xEndBound = col0Boundary;
+                    } else if(mousePos.x > col0Boundary + blockData.wallThickness && mousePos.x < col1Boundary) {
+                        q.index = 1;
+                        q.xStartBound = col0Boundary + blockData.wallThickness;
+                        q.xEndBound = col1Boundary;
+                    } else if(mousePos.x > col1Boundary + blockData.wallThickness && mousePos.x < col2Boundary) {
+                        q.index = 2;
+                        q.xStartBound = col1Boundary + blockData.wallThickness;
+                        q.xEndBound = col2Boundary;
+                    }
+                }
+                
+                function getRow(q) {
+                    if(mousePos.y > 0 && mousePos.y < row0Boundary) {
+                        q.index += 0;
+                        q.yStartBound = 0;
+                        q.yEndBound = row0Boundary;
+                    } else if(mousePos.y > row0Boundary + blockData.wallThickness && mousePos.y < row1Boundary) {
+                        q.index += 3;
+                        q.yStartBound = row0Boundary + blockData.wallThickness;
+                        q.yEndBound = row1Boundary;
+                    } else if(mousePos.y > row1Boundary + blockData.wallThickness && mousePos.y < row2Boundary) {
+                        q.index += 6;
+                        q.yStartBound = row1Boundary + blockData.wallThickness;
+                        q.yEndBound = row2Boundary;
+                    }
+                }
+                
+                var quadrant = {
+                    index : 0,
+                    claimedBy : 0,
+                    xStartBound : 0,
+                    xEndBound : 0,
+                    yStartBound : 0,
+                    yEndBound : 0
+                }
+                
+                getColumn(quadrant);
+                getRow(quadrant);
+                return(quadrant);
+            }
+            
+            function drawCircle(canvas, quadrant) {
+                var ctx = canvas.getContext('2d');
+                ctx.beginPath();
+                ctx.arc(quadrant.xStartBound+((quadrant.xEndBound-quadrant.xStartBound)/2),
+                        quadrant.yStartBound+((quadrant.yEndBound-quadrant.yStartBound)/2),
+                        blockData.width/2*(.8),
+                        0,
+                        2*Math.PI,
+                        false);
+                ctx.lineWidth = blockData.wallThickness*(.8);
+                ctx.strokeStyle = "gold";
+                ctx.stroke();
+            }
+            
+            function drawCross(canvas, quadrant) {
+                var ctx = canvas.getContext('2d');
+                ctx.beginPath();
+                ctx.lineWidth = blockData.wallThickness*(.8);
+                ctx.strokeStyle = "black";
+                var buff = 10;
+                ctx.moveTo(quadrant.xStartBound + buff, quadrant.yStartBound + buff);
+                ctx.lineTo(quadrant.xEndBound - buff, quadrant.yEndBound - buff);
+                ctx.stroke(); // Positive line
+                ctx.moveTo(quadrant.xEndBound - buff, quadrant.yStartBound + buff);
+                ctx.lineTo(quadrant.xStartBound + buff, quadrant.yEndBound - buff);
+                ctx.stroke(); // Negative line
+            }
+            
+            function getMousePos(canvas, e) {
+                var rect = canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                }
+            }
+            
+            function checkWins(player, gameMoves) {
+                function checkRows(i) {
+                    try {
+                        if(gameMoves[i].claimedBy === player) {
+                            if(gameMoves[i+1].claimedBy === player) {
+                                if(gameMoves[i+2].claimedBy === player) {
+                                    return true
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+                function checkColumns(i) {
+                    try {
+                        if(gameMoves[i].claimedBy === player) {
+//                             console.log("[Col] Quad @ index "+i+" marked as claimed by "+player);
+                            if(gameMoves[i+3].claimedBy === player) {
+//                                 console.log("[Col] Quad @ index "+i+" marked as claimed by "+player);
+                                if(gameMoves[i+6].claimedBy === player) {
+//                                     console.log("[Col] Quad @ index "+i+" marked as claimed by "+player);
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                for(var i=0; i<3; i++) {
+                    if(checkRows(i*3) === true || checkColumns(i) === true) {
+                        return true;
+                    }
+                }
+                try {
+                    if(gameMoves[0].claimedBy === player) { // Check negative diagonal for wins  
+                        if(gameMoves[4].claimedBy === player) {
+                            if(gameMoves[8].claimedBy === player) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch(e) {}
+                try {
+                    if(gameMoves[2].claimedBy === player) { // Check positive  diagonal for wins
+                        if(gameMoves[4].claimedBy === player) {
+                            if(gameMoves[6].claimedBy === player) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch(e) {}
+                return false;
+            }
+            
+            $(document).ready(function() {
+                var gameMoves = new Array(9);
+                var currentPlayer = 'X'; // Player 1 always goes first
+                $("#currentPlayer").text(currentPlayer); // Init
+                
+                c.addEventListener('click', function(e) {
+                    var mousePos = getMousePos(c, e);
+                    var quad = getQuadrant(c, blockData, mousePos);
+                    if(typeof(gameMoves[quad.index]) === 'undefined') { // No move in this quadrant yet
+                        if(currentPlayer === 'X') {
+                            drawCross(c, quad);
+                        } else if(currentPlayer === 'O') {
+                            drawCircle(c, quad);
+                        }
+                        quad.claimedBy = currentPlayer;
+                        gameMoves[quad.index] = quad;
+                        if(checkWins(currentPlayer, gameMoves) === true) {
+                            alert(currentPlayer+" wins!");
+                        }
+                        currentPlayer = currentPlayer === 'X' ? 'O' : 'X'
+                    }
+                    $("#currentPlayer").text(currentPlayer);
+                });
+            });
+            
         </script>
     </body>
 </html>
