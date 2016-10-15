@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>Pong</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            canvas
+            {
+                position: absolute;
+                margin: auto;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <script>
+        
+        var WIDTH = 700, HEIGHT = 600, pi = Math.PI;
+        var UpArrow = 38, DownArrow = 40;
+        var canvas, ctx, keystate;
+        var player, ai, ball;
+        
+        player = {
+            x: null,
+            y: null,
+            width: 20,
+            height: 100,
+            
+            update: function() {
+                if(keystate[UpArrow]) this.y -= 7;
+                if(keystate[DownArrow]) this.y+= 7;
+            },
+            drawImage: function() {
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+        };
+        
+        ai = {
+            x: null,
+            y: null,
+            width: 20,
+            height: 100,
+            
+            update: function() {
+                var destination = ball.y - (this.height - ball.side) * 0.5;
+                this.y += (destination - this.y) * 0.1;
+            },
+            drawImage: function() {
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+        };
+        
+        ball = {
+            x: null,
+            y: null,
+            velocity: null,
+            side: 20,
+            speed: 7,
+            
+            update: function() {
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                
+                // y border collision and bounce
+                if(0 > this.y || this.y + this.side > HEIGHT)
+                {
+                    // ternary operator 
+                    var offset = this.velocity.y < 0 ? 0 - this.y : HEIGHT - (this.y + this.side);
+                    this.y += 2 * offset;
+                    this.velocity.y *= -1;
+                }
+                
+                // axis and box (pong bar) intersection
+                var Intersect = function(ax, ay, aw, ah, bx, by, bh, bw) {
+                    return ax < bx + bw && ay < by + bh && bx < ax + aw && by < ay + ah;
+                };
+                // paddle collision
+                var paddle = this.velocity.x < 0 ? player : ai;
+                if(Intersect(paddle.x, paddle.y, paddle.width, paddle.height,
+                        this.x, this.y, this.side, this.side))
+                        {
+                            // offset 
+                            this.x = paddle === player ? player.x + player.width : ai.x - this.side;
+                            // value of where the ball hits the paddle
+                            var n = (this.y + this.side - paddle.y)/(paddle.height + this.side);
+                            // reflection angle = pi/4
+                            // -45 degrees refletion angle if it hits the top of the paddle
+                            // 45 degrees reflection angle if it hits the bottom of the paddle
+                            var angle = 0.25 * pi * (2 * n - 1);
+                            // added velocity 
+                            var smash = Math.abs(angle) > 0.2 * pi ? 1.5 : 1;
+                            // ternary operator for bounce
+                            this.velocity.x = smash * (paddle === player ? 1 : -1) * this.speed*Math.cos(angle);
+                            this.velocity.y = smash * this.speed*Math.sin(angle);
+                        }
+                        
+                        if(0 > this.x + this.side || this.x > WIDTH)
+                        {
+                            ball.x = (WIDTH - ball.side)/2;
+                            ball.y = (HEIGHT - ball.side)/2;
+            
+                            ball.velocity = 
+                            {
+                                x: (paddle === player ? 1 : -1) * ball.speed,
+                                y: 0
+                            }
+                        }
+            },
+            drawImage: function() {
+                ctx.fillRect(this.x, this.y, this.side, this.side);
+                }
+        };
+        
+        function main() {
+            canvas = document.createElement("canvas");
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+            //The HTMLCanvasElement.getContext() method returns a drawing context on the canvas, 
+            //or null if the context identifier is not supported.prototype
+            //"2d", leading to the creation of a CanvasRenderingContext2D object representing a two-dimensional rendering context.
+            ctx = canvas.getContext("2d");
+            document.body.appendChild(canvas);
+            
+            keystate = {};
+            document.addEventListener("keydown", function(evt) {
+                keystate[evt.keyCode] = true;
+            });
+            
+            document.addEventListener("keyup", function(evt) {
+                delete keystate[evt.keyCode];
+            });
+            
+            init();
+            
+            var loop = function() {
+                update();
+                drawImage();
+                
+                window.requestAnimationFrame(loop, canvas);
+            };
+            window.requestAnimationFrame(loop, canvas);
+            }
+            
+        
+        function init() {
+            player.x = player.width;
+            player.y = (HEIGHT - player.height)/2;
+            
+            ai.x = WIDTH - (player.width + ai.width);
+            ai.y = (HEIGHT - ai.height)/2;
+            
+            ball.x = (WIDTH - ball.side)/2;
+            ball.y = (HEIGHT - ball.side)/2;
+            
+            ball.velocity = 
+            {
+                x: ball.speed,
+                y: 0
+            }
+        }
+        
+        function update() {
+            ball.update();
+            player.update();
+            ai.update();
+            
+        }
+        
+        //The drawImage() method draws an image, canvas, or video onto the canvas.
+        function drawImage() {
+            // color
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            
+            ball.drawImage();
+            player.drawImage();
+            ai.drawImage();
+            
+            // net
+            var w = 4;
+            var x = (WIDTH - w)* 0.5;
+            var y = 0;
+            var step = HEIGHT/20;
+            while(y < HEIGHT)
+            {
+                ctx.fillRect(x, y + step * 0.25, w, step * 0.5);
+                y += step;
+            }
+            // color
+            ctx.restore();
+        }
+        
+        main();
+    
+        </script>
+    </body>
+</html>
